@@ -1,5 +1,6 @@
 # Ignore requirements.md file
 requirements.md
+sample_ddos_events.json
 
 # Node.js dependencies
 node_modules/

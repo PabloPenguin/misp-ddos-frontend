@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Live MISP dashboard visualising distributed denial of service (DDoS) events for SOC analysts."
+    />
+    <title>MISP DDoS Events Dashboard</title>
+    <link rel="stylesheet" href="./assets/css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <header class="app-header" role="banner">
+      <div class="branding">
+        <h1>MISP DDoS Events Dashboard</h1>
+        <p>Real-time situational awareness for SOC teams monitoring DDoS activity.</p>
+      </div>
+      <div class="header-controls">
+        <div class="status-group" aria-live="polite">
+          <span class="status-indicator" id="data-status" aria-hidden="true"></span>
+          <span id="status-text">Connecting…</span>
+        </div>
+        <div class="timestamp" aria-live="polite">
+          Last update: <span id="last-updated">—</span>
+        </div>
+        <div class="control-buttons">
+          <button id="refresh-button" class="button" type="button">Refresh Now</button>
+          <label class="toggle" for="auto-refresh-toggle">
+            <input type="checkbox" id="auto-refresh-toggle" checked />
+            <span>Auto-refresh</span>
+          </label>
+          <button id="theme-toggle" class="button button-secondary" type="button" aria-pressed="false">
+            Toggle Theme
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1">
+      <section id="error-banner" class="banner banner-error" role="status" aria-live="assertive" hidden></section>
+
+      <section class="summary" aria-label="Event summary">
+        <article class="summary-card">
+          <h2>Total Events</h2>
+          <p id="summary-total">0</p>
+          <small>Events returned by the current filters</small>
+        </article>
+        <article class="summary-card">
+          <h2>Unique Sources</h2>
+          <p id="summary-organisations">0</p>
+          <small>Distinct reporting organisations</small>
+        </article>
+        <article class="summary-card">
+          <h2>Indicators</h2>
+          <p id="summary-indicators">0</p>
+          <small>Total attributes across displayed events</small>
+        </article>
+        <article class="summary-card">
+          <h2>High Severity</h2>
+          <p id="summary-high">0</p>
+          <small>Events rated high or critical</small>
+        </article>
+      </section>
+
+      <section class="visual-insights" aria-label="Visual analytics">
+        <article class="insight-card">
+          <header>
+            <h2>TLP Coverage</h2>
+            <p class="insight-meta">Sensitivity breakdown across shared intelligence</p>
+          </header>
+          <canvas id="tlp-chart" role="img" aria-label="DDoS events by TLP"></canvas>
+          <dl class="chart-legend" id="tlp-legend"></dl>
+        </article>
+        <article class="insight-card">
+          <header>
+            <h2>Repeat Attack Sources</h2>
+            <p class="insight-meta">Most frequently re-used attacker IP addresses</p>
+          </header>
+          <canvas id="repeat-ip-chart" role="img" aria-label="Top reused attacker IP addresses"></canvas>
+          <dl class="chart-legend" id="repeat-ip-legend"></dl>
+        </article>
+        <article class="insight-card">
+          <header>
+            <h2>Activity Over Time</h2>
+            <p class="insight-meta">Event volume trend by day</p>
+          </header>
+          <canvas id="timeline-chart" role="img" aria-label="DDoS events timeline"></canvas>
+          <dl class="chart-legend" id="timeline-legend"></dl>
+        </article>
+        <article class="insight-card">
+          <header>
+            <h2>Top Reporting Organisations</h2>
+            <p class="insight-meta">Who is sharing intelligence most often</p>
+          </header>
+          <canvas id="top-org-chart" role="img" aria-label="Top reporting organisations"></canvas>
+          <dl class="chart-legend" id="org-legend"></dl>
+        </article>
+      </section>
+
+      <section class="filters" aria-label="Event filters">
+        <div class="filter-group">
+          <label for="search-input">Search</label>
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Search by event name, tag, IP, organisation…"
+            autocomplete="off"
+          />
+        </div>
+        <div class="filter-group">
+          <label for="severity-filter">Severity</label>
+          <select id="severity-filter">
+            <option value="all">All severities</option>
+            <option value="high">High / Critical</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="undefined">Undefined</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="tlp-filter">TLP</label>
+          <select id="tlp-filter">
+            <option value="all">All TLP levels</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="source-filter">Source</label>
+          <select id="source-filter">
+            <option value="all">All organisations</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="start-date">Start date</label>
+          <input id="start-date" type="date" />
+        </div>
+        <div class="filter-group">
+          <label for="end-date">End date</label>
+          <input id="end-date" type="date" />
+        </div>
+      </section>
+
+      <section class="table-section" aria-label="Event listings">
+        <div class="table-actions">
+          <p id="result-count">0 events</p>
+          <div class="table-buttons">
+            <button id="export-csv" class="button button-secondary" type="button">Export CSV</button>
+          </div>
+        </div>
+        <div class="table-wrapper" role="region" aria-live="polite" aria-label="DDoS events table">
+          <table id="events-table">
+            <thead>
+              <tr>
+                <th scope="col" data-sort="date">Date</th>
+                <th scope="col" data-sort="info">Event</th>
+                <th scope="col" data-sort="severity">Severity</th>
+                <th scope="col" data-sort="tlp">TLP</th>
+                <th scope="col" data-sort="org">Source</th>
+                <th scope="col" data-sort="srcCount">Src IPs</th>
+                <th scope="col" data-sort="dstCount">Dst IPs</th>
+                <th scope="col" data-sort="attributes">Indicators</th>
+                <th scope="col">Details</th>
+              </tr>
+            </thead>
+            <tbody id="events-tbody">
+              <tr>
+                <td colspan="9">
+                  <div class="placeholder">Loading events…</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>
+        Data sourced from
+        <a href="https://github.com/PabloPenguin/misp-ddos-events" rel="noopener" target="_blank"
+          >misp-ddos-events repository</a
+        >.
+      </p>
+      <p>
+        Built for security operations teams. Last exported: <span id="export-timestamp">—</span>
+      </p>
+    </footer>
+
+    <script type="module" src="./assets/js/app.js"></script>
+  </body>
+</html>
